@@ -56,57 +56,7 @@ def _gerar_hash_prompt(prompt: str) -> str:
     """Gera um hash único para o prompt."""
     return hashlib.md5(prompt.encode()).hexdigest()
 
-# Remover funções relacionadas ao Ollama
-#@lru_cache(maxsize=200)  # Aumenta cache para 200 entradas
-#def _chamar_ollama_api_cached(prompt_hash: str, prompt: str) -> str:
-#    """Versão em cache da chamada à API do Ollama."""
-#    return _chamar_ollama_api(prompt)
 
-#def _chamar_ollama_api(prompt: str) -> str:
-#    """Chama a API do Ollama e mede o tempo de execução."""
-#    url = "http://localhost:11434/api/generate"
-#    
-#    print("Iniciando chamada à API...")
-#    start_time = time.time()
-#    
-#    try:
-#        response = requests.post(
-#            url,
-#            json={
-#                "model": "neural-chat",
-#                "prompt": prompt,
-#                "stream": False,
-#                "options": {
-#                    "temperature": 0.5,
-#                    "top_p": 0.8,
-#                    "top_k": 20,
-#                    "num_ctx": 512,  # Reduzido para evitar timeout
-#                    "num_thread": 4,  # Reduzido para evitar sobrecarga
-#                    "repeat_penalty": 1.1,
-#                    "mirostat": 2,
-#                    "mirostat_eta": 0.1,
-#                    "mirostat_tau": 5.0,
-#                    "num_batch": 256  # Reduzido para evitar timeout
-#                }
-#            },
-#            timeout=180,  # Aumentado para 3 minutos
-#            headers={"Content-Type": "application/json"},
-#            verify=False
-#        )
-#        
-#        if response.status_code == 200:
-#            result = response.json()
-#            end_time = time.time()
-#            execution_time = end_time - start_time
-#            print(f"Resposta recebida com sucesso em {execution_time:.2f} segundos")
-#            return result.get('response', '').strip()
-#        else:
-#            print(f"Erro na API: {response.status_code}")
-#            raise Exception(f"Erro na API: {response.status_code}")
-#            
-#    except requests.exceptions.RequestException as e:
-#        print(f"Erro na requisição: {str(e)}")
-#        raise
 
 def _gerar_prompt(correlacoes_texto: List[str], top_insights: List[str]) -> str:
     """Gera o prompt para a IA de forma otimizada."""
@@ -364,61 +314,6 @@ def gerar_insights_ia(correlacoes: Dict[str, pd.DataFrame]) -> str:
     print(f"[DEBUG] Fallback acionado: {fallback}")
     return fallback
 
-def gerar_insights_e_acoes_por_categoria(categoria: str, dados_categoria: Dict, correlacoes_gerais: pd.DataFrame) -> List[Dict[str, str]]:
-    """
-    Gera insights e ações sugeridas para uma categoria específica usando a API do Ollama.
-    """
-    print(f"Gerando insights e ações para a categoria: {categoria}...")
-
-    # Preparar dados da categoria para o prompt
-    dados_prompt = f"Análise para a categoria '{categoria}':\n\n"
-
-    # Adicionar dados numéricos relevantes (se houver correlação forte)
-    if categoria in correlacoes_gerais['variavel'].values:
-        corr_data = correlacoes_gerais[correlacoes_gerais['variavel'] == categoria].iloc[0]
-        dados_prompt += f"Correlação com LTV: {corr_data.get('correlacao_com_ltv', 'N/A'):.2f}\n"
-        dados_prompt += f"Correlação com Ticket Médio: {corr_data.get('correlacao_com_ticket', 'N/A'):.2f}\n\n"
-
-    # Adicionar dados de distribuição/moda da categoria
-    if 'moda' in dados_categoria:
-         dados_prompt += f"Moda: {dados_categoria['moda']}\n"
-         dados_prompt += "Distribuição (%):\n"
-         for key, value in dados_categoria['distribuicao'].items():
-             dados_prompt += f"- {key}: {value}\n"
-         dados_prompt += "\n"
-
-    # Gerar prompt para a IA
-    prompt = f"""Com base nos dados fornecidos sobre a categoria '{categoria}' e suas correlações, gere 3 a 5 insights acionáveis e uma ação sugerida para cada insight. O objetivo é otimizar LTV e Ticket Médio.\n\n十二章DADOS:\n{dados_prompt}\n\nFormato de saída desejado (use markdown):\n**Insight 1:** [Insight]\n**Ação Sugerida:** [Ação]\n\n**Insight 2:** [Insight]\n**Ação Sugerida:** [Ação]\n\n... (até 5 insights com ações)"""
-
-    try:
-        # Chamar a API do Ollama com cache
-        prompt_hash = _gerar_hash_prompt(prompt)
-        response_text = _chamar_ollama_api_cached(prompt_hash, prompt)
-
-        # Analisar a resposta para extrair insights e ações
-        insights_e_acoes = []
-        # Dividir a resposta por insights
-        blocos_insights = response_text.split("**Insight ")[1:] # Ignora o texto antes do primeiro insight
-
-        for bloco in blocos_insights:
-            partes = bloco.split("**Ação Sugerida:**")
-            if len(partes) == 2:
-                insight_texto = partes[0].strip()
-                acao_texto = partes[1].strip()
-
-                # Remover o número do insight do texto do insight (ex: "1:** ")
-                insight_texto = ":**".join(insight_texto.split(":**")[1:]).strip()
-
-                insights_e_acoes.append({
-                    "insight": insight_texto,
-                    "acao": acao_texto
-                })
-
-        return insights_e_acoes
-
-    except Exception as e:
-        print(f"Erro ao gerar insights para {categoria}: {e}")
-        return [] # Retorna lista vazia em caso de erro 
 
 def gerar_acao_sugerida_para_insight(insight_texto: str) -> str:
     """

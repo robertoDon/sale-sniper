@@ -7,7 +7,7 @@ from components.utils import (
     get_variaveis_default,
     formatar_valor
 )
-from services.ai_insights import gerar_insights_ia, gerar_insights_e_acoes_por_categoria, gerar_acao_sugerida_para_insight
+from services.ai_insights import gerar_insights_ia, gerar_acao_sugerida_para_insight
 import locale
 import pandas as pd
 from typing import Dict, List
